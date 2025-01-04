@@ -33,7 +33,7 @@ api:
 
 The Alphavantage should just work with the API key you've gotten from them.
 
-Schwab is a bit more complex. You need to set up an app on the "Apps Dashboard" of their website, using the "Market Data Production" API product. That level of security only allows you to view data, no trading. Then it will take a week for them to approve it. Then you'll have the app_key and app_secret, to update the config.yml.
+Schwab is a bit more complex. You need to set up an app on the "Apps Dashboard" of their website `https://developer.schwab.com/`, using the "Market Data Production" API product. That level of security only allows you to view data, no trading. Then it will take a week for them to approve it. Then you'll have the app_key and app_secret, to update the config.yml.
 
 After that, running `collect-data` for the first time will open up a Schwab login web page. You'll need to log in using your trading account login, not your developer account login. It will ask you for approval, and the account this is linked to. 
 
