@@ -41,12 +41,6 @@ After that it will try to open up a 127.0.0.1 URL with a key. It will fail. Grab
 
 You'll be good to go after that. You should not need to jump through these hoops again for a long time.
 
-### Other Settings
-- Database paths and names
-- Logging preferences
-- Options analysis parameters (minimum volume, price, etc.)
-- API batch sizes and rate limits
-
 ## Usage
 
 The workflow consists of three steps:
@@ -91,6 +85,22 @@ SchwabV2/
 └── README.md       # Project documentation
 ```
 
+## What if I don't want to use Alphavantage?
+
+Right now this is just a way to get a list of active stocks. It creates an sqlite3 database, with one table. `ActiveStocks.db` in data/db. You are free to create this sqlite3 DB and populate it any way you wish. As of version 0.9 The `assetType` column data isn't currently refered to.
+
+### SQL for creating the `all_active_stocks` table in `ActiveStocks.db`
+
+```
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE all_active_stocks (
+                symbol TEXT PRIMARY KEY,
+                assetType TEXT 
+            );
+COMMIT;
+```
+
 ## Output Format
 
 The analysis output shows:
@@ -110,18 +120,4 @@ Options shown are filtered for:
 - Stocks with sufficient volume
 - Prices above $5
 
-### What if I don't want to use Alphavantage?
 
-Right now this is just a way to get a list of active stocks. It creates an sqlite3 database, with one table. `ActiveStocks.db` in data/db. You are free to create this sqlite3 DB and populate it any way you wish. As of version 0.9 The `assetType` column data isn't currently refered to.
-
-### SQL for creating the `all_active_stocks` table in `ActiveStocks.db`
-
-```
-PRAGMA foreign_keys=OFF;
-BEGIN TRANSACTION;
-CREATE TABLE all_active_stocks (
-                symbol TEXT PRIMARY KEY,
-                assetType TEXT 
-            );
-COMMIT;
-```
