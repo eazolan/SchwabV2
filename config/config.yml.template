@@ -1,0 +1,28 @@
+api:
+  batch_size: 300
+  retry_attempts: 3
+  rate_limit_delay: 0.5
+  alphavantage:
+    key: "YOUR_ALPHAVANTAGE_API_KEY"
+    base_url: "https://www.alphavantage.co/query"
+  schwab:
+    app_key: "YOUR_SCHWAB_APP_KEY"
+    app_secret: "YOUR_SCHWAB_APP_SECRET"
+    callback_url: "YOUR_CALLBACK_URL"
+
+database:
+  base_dir: 'data/db'
+  stock_db_name: 'BasicStockData.db'
+  active_stocks_db_name: 'ActiveStocks.db'
+  temp_table_name: 'temp_options_table'
+  options_table_name: 'option_chains'
+  
+options:
+  min_volume: 1000000
+  min_stock_price: 5
+  strike_count: 10
+  
+logging:
+  level: INFO
+  file: 'data/logs/schwab_api.log'
+  format: '%(message)s'
