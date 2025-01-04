@@ -1,5 +1,6 @@
 # Config with real credentials
 config/config.yml
+tokens.json
 
 # Database files
 data/db/*.db

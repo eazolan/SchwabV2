@@ -7,7 +7,7 @@ A Python tool for analyzing Schwab API data and options. Collects active stock d
 Clone the repository and install in development mode:
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/eazolan/SchwabV2
 cd SchwabV2
 pip install -e .
 ```
