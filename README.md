@@ -114,7 +114,7 @@ Options shown are filtered for:
 
 Right now this is just a way to get a list of active stocks. It creates an sqlite3 database, with one table. `ActiveStocks.db` in data/db. You are free to create this sqlite3 DB and populate it any way you wish. As of version 0.9 The `assetType` column data isn't currently refered to.
 
-## SQL for creating the `all_active_stocks` table in `ActiveStocks.db`
+### SQL for creating the `all_active_stocks` table in `ActiveStocks.db`
 
 ```
 PRAGMA foreign_keys=OFF;
