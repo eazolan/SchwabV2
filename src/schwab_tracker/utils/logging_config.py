@@ -21,14 +21,23 @@ def setup_logging(config: Dict) -> None:
     log_file = Path(config['logging']['file'])
     log_file.parent.mkdir(exist_ok=True)
 
+    # Create a formatter with timestamps
+    default_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Configure handlers with the new formatter
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setFormatter(default_formatter)
+    
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(default_formatter)
+
     # Configure logging
     logging.basicConfig(
         level=getattr(logging, config['logging']['level']),
-        format=config['logging']['format'],
-        handlers=[
-            logging.FileHandler(str(log_file)),
-            logging.StreamHandler()  # Also output to console
-        ]
+        handlers=[file_handler, console_handler]
     )
 
     # Create logger for the application
@@ -38,7 +47,8 @@ def setup_logging(config: Dict) -> None:
     # Add more detailed formatting for debug level
     if config['logging']['level'] == 'DEBUG':
         debug_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
         )
         for handler in logger.handlers:
             handler.setFormatter(debug_formatter)

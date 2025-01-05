@@ -16,23 +16,27 @@ logger = logging.getLogger(__name__)
 def get_quotes(client, db_manager):
     """Get quotes for all active symbols and store in database."""
     try:
-        # Connect to ActiveStocks database to get symbols
+        # Log database paths explicitly
+        logger.info(f"Source DB: {db_manager.active_stocks_db_path}")
+        logger.info(f"Destination DB: {db_manager.stock_db_path}")
+        
+        # Verify source database
         with database_connection(db_manager.active_stocks_db_path) as conn_source:
             cursor_source = conn_source.cursor()
             cursor_source.execute("SELECT symbol FROM all_active_stocks")
             all_symbols = [row[0] for row in cursor_source.fetchall()]
+            logger.info(f"Found {len(all_symbols)} symbols. First 5: {all_symbols[:5]}")
 
-        print(f"Found {len(all_symbols)} symbols in {db_manager.active_stocks_db_path}")
-
-        # Create/Connect to BasicStockData database
+        # Verify destination database before operations
         with database_connection(db_manager.stock_db_path) as conn_dest:
             cursor_dest = conn_dest.cursor()
-
-            # Drop the table if it exists
+            
+            # Log table drop
+            logger.info("Dropping existing stock_data table...")
             cursor_dest.execute('DROP TABLE IF EXISTS stock_data')
-            print("Dropped existing stock_data table")
-
-            # Create new table
+            
+            # Log table creation
+            logger.info("Creating new stock_data table...")
             cursor_dest.execute('''
                 CREATE TABLE stock_data (
                     symbol TEXT,
@@ -40,43 +44,46 @@ def get_quotes(client, db_manager):
                     asset_main_type TEXT,
                     asset_sub_type TEXT,
                     quote_type TEXT,
-                    
                     fund_avg_10day_volume REAL,
                     fund_avg_1year_volume REAL,
                     quote_bid_price REAL,
                     quote_total_volume INTEGER,
-                    
                     PRIMARY KEY (symbol, timestamp)
                 )
             ''')
+            conn_dest.commit()  # Commit table creation explicitly
+            
+            # Verify table exists
+            cursor_dest.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_data'")
+            if cursor_dest.fetchone():
+                logger.info("stock_data table created successfully")
+            else:
+                logger.error("Failed to create stock_data table!")
+                return
 
-            # Process symbols in batches
+            # Process symbols in batches with better error handling
             batch_size = 300
             total_processed = 0
 
             for i in range(0, len(all_symbols), batch_size):
                 batch = all_symbols[i:i + batch_size]
-                print(f"\nProcessing batch {(i//batch_size)+1} of {(len(all_symbols)-1)//batch_size + 1}")
+                logger.info(f"Processing batch {(i//batch_size)+1} of {(len(all_symbols)-1)//batch_size + 1}")
 
                 try:
                     response = client.get_quotes(batch)
                     quotes_data = response.json()
-
-                    # Handle invalid symbols from the errors object
-                    if 'errors' in quotes_data:
-                        error_info = quotes_data.pop('errors')
-                        if 'invalidSymbols' in error_info:
-                            invalid_symbols = error_info['invalidSymbols']
-                            print(f"Invalid symbols: {', '.join(invalid_symbols)}")
+                    
+                    # Log response size
+                    logger.info(f"Received data for {len(quotes_data)} symbols")
 
                     timestamp = datetime.now().isoformat()
                     
-                    # Process each quote
+                    rows_in_batch = 0
                     for symbol, data in quotes_data.items():
                         try:
                             fundamental = data.get('fundamental', {})
                             quote = data.get('quote', {})
-
+                            
                             cursor_dest.execute('''
                                 INSERT INTO stock_data (
                                     symbol, timestamp, asset_main_type, asset_sub_type,
@@ -94,26 +101,34 @@ def get_quotes(client, db_manager):
                                 quote.get('bidPrice'),
                                 quote.get('totalVolume')
                             ))
-
-                            total_processed += 1
+                            rows_in_batch += 1
 
                         except sqlite3.Error as e:
-                            print(f"Error inserting data for {symbol}: {e}")
+                            logger.error(f"SQLite error inserting data for {symbol}: {e}")
 
+                    # Commit after each batch and log the count
                     conn_dest.commit()
-                    print(f"Processed {total_processed} symbols so far...")
+                    total_processed += rows_in_batch
+                    logger.info(f"Committed {rows_in_batch} rows in this batch. Total processed: {total_processed}")
 
-                    # Add a small delay to avoid hitting rate limits
+                    # Verify data after each batch
+                    cursor_dest.execute("SELECT COUNT(*) FROM stock_data")
+                    current_count = cursor_dest.fetchone()[0]
+                    logger.info(f"Current row count in database: {current_count}")
+
                     time.sleep(0.5)
 
                 except Exception as e:
-                    print(f"Error getting quotes for batch: {e}")
+                    logger.error(f"Error processing batch: {e}", exc_info=True)
                     continue
 
-            print(f"\nCompleted processing {total_processed} symbols")
+            # Final verification
+            cursor_dest.execute("SELECT COUNT(*) FROM stock_data")
+            final_count = cursor_dest.fetchone()[0]
+            logger.info(f"Final row count in database: {final_count}")
 
     except Exception as e:
-        print(f"Error in get_quotes: {e}")
+        logger.error(f"Error in get_quotes: {e}", exc_info=True)
         raise
         
         

@@ -16,7 +16,10 @@ def database_connection(db_path: Path) -> Iterator[sqlite3.Connection]:
         
         conn = sqlite3.connect(db_path)
         yield conn
+        conn.commit()  # Add commit here before the connection closes
     except sqlite3.Error as e:
+        if conn:
+            conn.rollback()  # Explicitly rollback on error
         logger.error(f"Database error: {e}")
         raise
     finally:
