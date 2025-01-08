@@ -9,6 +9,7 @@ Clone the repository and install in development mode:
 ```bash
 git clone https://github.com/eazolan/SchwabV2
 cd SchwabV2
+pip install setuptools
 pip install -e .
 ```
 
