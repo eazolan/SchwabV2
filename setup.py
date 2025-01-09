@@ -5,6 +5,7 @@ setup(
     version="0.9.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    setup_requires=['setuptools'],
     install_requires=[
         "pyyaml>=6.0",
         "python-dotenv>=1.0.0",
@@ -15,7 +16,7 @@ setup(
         'console_scripts': [
             'analyze-options=schwab_tracker.scripts.analyze_options:main',
             'collect-data=schwab_tracker.scripts.collect_data:main',
-            'get-symbols=schwab_tracker.scripts.get_active_symbols:main',  # New command
+            'get-symbols=schwab_tracker.scripts.get_active_symbols:main',
         ],
     },
     python_requires=">=3.7",
