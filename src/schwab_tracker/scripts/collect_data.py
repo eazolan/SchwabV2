@@ -13,12 +13,14 @@ from schwab_tracker.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
-def get_quotes(client, db_manager):
+def get_quotes(client, db_manager, config):  
     """Get quotes for all active symbols and store in database."""
     try:
         # Log database paths explicitly
         logger.info(f"Source DB: {db_manager.active_stocks_db_path}")
         logger.info(f"Destination DB: {db_manager.stock_db_path}")
+        batch_size = config['api']['batch_size']  # Use configured batch size
+        rate_limit_delay = config['api']['rate_limit_delay']  # Get configured delay
         
         # Verify source database
         with database_connection(db_manager.active_stocks_db_path) as conn_source:
@@ -61,8 +63,6 @@ def get_quotes(client, db_manager):
                 logger.error("Failed to create stock_data table!")
                 return
 
-            # Process symbols in batches with better error handling
-            batch_size = 300
             total_processed = 0
 
             for i in range(0, len(all_symbols), batch_size):
@@ -116,7 +116,7 @@ def get_quotes(client, db_manager):
                     current_count = cursor_dest.fetchone()[0]
                     logger.info(f"Current row count in database: {current_count}")
 
-                    time.sleep(0.5)
+                    time.sleep(rate_limit_delay)
 
                 except Exception as e:
                     logger.error(f"Error processing batch: {e}", exc_info=True)
@@ -132,9 +132,10 @@ def get_quotes(client, db_manager):
         raise
         
         
-def populate_options_table(client, db_manager):
+def populate_options_table(client, db_manager, config):  # Added config parameter
     """Populate options data table with chains for high-volume stocks."""
     start_time = time.time()
+    rate_limit_delay = config['api']['rate_limit_delay']  # Get configured delay
 
     print("\nPopulating options table...")
 
@@ -275,7 +276,7 @@ def populate_options_table(client, db_manager):
                     print(f"Processed options for {symbol}")
 
                     # Add a small delay to avoid hitting rate limits
-                    time.sleep(0.5)
+                    time.sleep(rate_limit_delay)
 
                 except Exception as e:
                     print(f"Error processing options for {symbol}: {e}")
@@ -292,11 +293,9 @@ def populate_options_table(client, db_manager):
 def main():
     """Main entry point for data collection."""
     try:
-        # Load config (remove load_dotenv call)
         config = load_config()
         setup_logging(config)
 
-        # Initialize components with config values
         client = SchwabClient(
             config,
             config['api']['schwab']['app_key'],
@@ -305,13 +304,11 @@ def main():
         )
         db_manager = DatabaseManager(config)
 
-        # Run data collection
         print("\nCollecting stock quotes...")
-        get_quotes(client, db_manager)
+        get_quotes(client, db_manager, config)  # Pass config
 
-        # Then get options data
         print("\nCollecting options data...")
-        populate_options_table(client, db_manager)
+        populate_options_table(client, db_manager, config)  # Pass config
 
     except Exception as e:
         logger.error(f"Error in data collection: {e}")
