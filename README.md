@@ -64,6 +64,7 @@ analyze-options -f 25000 -r 10
 Parameters for analyze-options:
 - `-f, --funds`: Available funds for trading
 - `-r, --results`: Number of top results to display (default: 10)
+- `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers). By default, these are filtered out.
 
 ## Folder Structure
 
@@ -120,5 +121,4 @@ Options shown are filtered for:
 - Out-of-the-money only
 - Stocks with sufficient volume
 - Prices above $5
-
-
+- Standard options only (unless --include-nonstandard is specified)

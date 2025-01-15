@@ -13,6 +13,7 @@ from schwab_tracker.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
+
 def get_quotes(client, db_manager, config):  
     """Get quotes for all active symbols and store in database."""
     try:

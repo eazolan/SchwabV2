@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class OptionMetrics:
     symbol: str
@@ -15,34 +16,82 @@ class OptionMetrics:
     contracts: int
     premiums: Decimal
     exercise: Decimal
-    
+
     @property
     def profit_potential(self) -> Decimal:
         """Calculate potential profit from the option."""
         return self.premiums + self.exercise
 
+
 class OptionsAnalyzer:
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, include_nonstandard=False):
         self.db = db_manager
+        self.include_nonstandard = include_nonstandard
+        logger.info(f"OptionsAnalyzer initialized with include_nonstandard={include_nonstandard}")
 
     def get_otm_options(self) -> List[Dict[str, Any]]:
         """Fetch out-of-the-money options from database."""
-        return self.db.execute_query("""
+        # First query to get all options without filtering non-standard ones
+        base_query = """
             SELECT 
                 symbol, 
                 expirationDate, 
                 strikePrice, 
                 bid, 
                 putCall, 
-                underlyingPrice
+                underlyingPrice,
+                option_symbol
             FROM temp_options_table
             WHERE bid > 0
             AND (
                 (putCall = 'CALL' AND strikePrice > underlyingPrice)
                 OR (putCall = 'PUT' AND strikePrice < underlyingPrice)
             )
-            ORDER BY symbol, expirationDate
-        """)
+        """
+
+        # Get total count before filtering
+        all_options = self.db.execute_query(base_query)
+        logger.info(f"Found {len(all_options)} total OTM options before filtering")
+
+        if not self.include_nonstandard:
+            # Add filter for non-standard options using GLOB to check for numbers
+            standard_query = base_query + """
+            AND NOT SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
+            """
+
+            # Get filtered results
+            results = self.db.execute_query(standard_query)
+            filtered_count = len(results)
+
+            # Log the filtering results
+            excluded_count = len(all_options) - filtered_count
+            if excluded_count > 0:
+                logger.info(f"Filtered out {excluded_count} non-standard options")
+
+                # Log examples of what was filtered out
+                excluded_query = """
+                    SELECT DISTINCT symbol, option_symbol, putCall
+                    FROM temp_options_table
+                    WHERE bid > 0
+                    AND SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
+                    AND (
+                        (putCall = 'CALL' AND strikePrice > underlyingPrice)
+                        OR (putCall = 'PUT' AND strikePrice < underlyingPrice)
+                    )
+                """
+                excluded_examples = self.db.execute_query(excluded_query)
+                if excluded_examples:
+                    logger.info("Examples of excluded non-standard options:")
+                    for ex in excluded_examples:
+                        logger.info(f"  {ex['symbol']}: {ex['option_symbol']} ({ex['putCall']})")
+
+            logger.info(f"Returning {filtered_count} standard options for analysis")
+            return results
+        else:
+            logger.info("Including non-standard options in analysis")
+            logger.info(f"Returning all {len(all_options)} options for analysis")
+            return all_options
+
 
     def calculate_metrics(self, option: Dict[str, Any], available_funds: Decimal) -> OptionMetrics:
         """Calculate relevant metrics for an option contract."""
@@ -58,12 +107,12 @@ class OptionsAnalyzer:
             contract_cost = strike * 100
         else:  # CALL
             contract_cost = stock_price * 100
-        
+
         contracts = int((available_funds // contract_cost))
-        
+
         # Calculate premiums and potential exercise value
         premiums = bid * 100 * contracts
-        
+
         if option_type == 'PUT':
             difference = (stock_price - strike) * contracts * 100
         else:  # CALL
@@ -79,7 +128,6 @@ class OptionsAnalyzer:
             exercise=difference
         )
 
-# ... (previous imports and OptionsAnalyzer class stay the same)
 
 class OptionsScreener:
     def __init__(self, analyzer: OptionsAnalyzer):
@@ -90,7 +138,7 @@ class OptionsScreener:
         """Screen for the best options based on available funds."""
         try:
             options_data = self.analyzer.get_otm_options()
-            
+
             # Calculate metrics for all options
             all_metrics = [
                 self.analyzer.calculate_metrics(option, available_funds)
@@ -119,7 +167,7 @@ class OptionsScreener:
                 ('PUT', best_puts),
                 ('CALL', best_calls)
             ])
-            
+
         except Exception as e:
             logger.error(f"Error in options screening: {e}")
             raise
@@ -129,17 +177,7 @@ class OptionsScreener:
         """Get the highest premium option for each symbol."""
         best_options = {}
         for option in options:
-            if (option.symbol not in best_options or 
-                option.premiums > best_options[option.symbol].premiums):
-                best_options[option.symbol] = option
-        return list(best_options.values())
-
-    @staticmethod
-    def _get_best_by_symbol(options: List[OptionMetrics]) -> List[OptionMetrics]:
-        """Get the highest premium option for each symbol."""
-        best_options = {}
-        for option in options:
-            if (option.symbol not in best_options or 
-                option.premiums > best_options[option.symbol].premiums):
+            if (option.symbol not in best_options or
+                    option.premiums > best_options[option.symbol].premiums):
                 best_options[option.symbol] = option
         return list(best_options.values())
