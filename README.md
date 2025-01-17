@@ -30,6 +30,7 @@ api:
     app_secret: "YOUR_SCHWAB_APP_SECRET" # From Schwab Developer Portal
     callback_url: "YOUR_CALLBACK_URL"    # Your OAuth callback URL
 ```
+
 ### First time running
 
 The Alphavantage should just work with the API key you've gotten from them.
@@ -56,15 +57,26 @@ get-symbols
 collect-data
 ```
 
-3. Analyze options based on available funds:
+3. Analyze options:
+
+For PUT options based on available funds:
 ```bash
-analyze-options -f 25000 -r 10
+analyze-options puts -f 25000 -r 10
 ```
 
-Parameters for analyze-options:
+For covered call opportunities on a specific stock:
+```bash
+analyze-options calls SYMBOL
+```
+
+Parameters for PUT analysis:
 - `-f, --funds`: Available funds for trading
 - `-r, --results`: Number of top results to display (default: 10)
 - `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers). By default, these are filtered out.
+
+Parameters for covered calls analysis:
+- `SYMBOL`: Stock symbol to analyze
+- `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers)
 
 ## Folder Structure
 
@@ -93,7 +105,7 @@ Right now this is just a way to get a list of active stocks. It creates an sqlit
 
 ### SQL for creating the `all_active_stocks` table in `ActiveStocks.db`
 
-```
+```sql
 PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;
 CREATE TABLE all_active_stocks (
@@ -105,20 +117,28 @@ COMMIT;
 
 ## Output Format
 
-The analysis output shows:
-1. PUT options first, followed by CALL options
-2. For each option:
-   - Symbol
-   - Expiration date
-   - Option type (PUT/CALL)
-   - Strike price
-   - Number of contracts possible with funds
-   - Premium (potential income)
-   - Exercise value
+### PUT Options Analysis
+Shows:
+- Symbol
+- Expiration date (next Friday only)
+- Strike price
+- Number of contracts possible with funds
+- Premium (potential income)
+- Exercise value
 
-Options shown are filtered for:
+Options are filtered for:
 - Expiring next Friday
 - Out-of-the-money only
 - Stocks with sufficient volume
 - Prices above $5
 - Standard options only (unless --include-nonstandard is specified)
+
+### Covered Calls Analysis
+Shows for a single stock:
+- All expiration dates within 90 days
+- Options at the highest strike price below current stock price
+- Bid price
+- Days to expiration
+- Delta and Theta Greeks
+- Annualized return percentage
+- Return if called percentage

@@ -8,7 +8,11 @@ from typing import Dict
 from schwab_tracker.utils.logging_config import setup_logging
 from schwab_tracker.database.operations import DatabaseManager
 from schwab_tracker.analysis.options_analyzer import OptionsAnalyzer, OptionsScreener
-from schwab_tracker.analysis.options_presenter import OptionsPresenter, create_options_report
+from schwab_tracker.analysis.options_presenter import (
+    OptionsPresenter,
+    create_options_report,
+    create_covered_calls_report  # Added this import
+)
 
 
 def load_config() -> Dict:
@@ -23,23 +27,42 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Analyze options based on available funds"
     )
-    parser.add_argument(
+
+    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+
+    # Put options analysis
+    puts_parser = subparsers.add_parser('puts', help='Analyze put options')
+    puts_parser.add_argument(
         "-f", "--funds",
         type=float,
         required=True,
         help="Available funds for trading"
     )
-    parser.add_argument(
+    puts_parser.add_argument(
         "-r", "--results",
         type=int,
         default=10,
         help="Number of top results to display (default: 10)"
     )
-    parser.add_argument(
+    puts_parser.add_argument(
         "--include-nonstandard",
         action="store_true",
         help="Include non-standard options (adjusted for splits/mergers)"
     )
+
+    # Covered calls analysis
+    calls_parser = subparsers.add_parser('calls', help='Analyze covered calls')
+    calls_parser.add_argument(
+        "symbol",
+        type=str,
+        help="Stock symbol to analyze"
+    )
+    calls_parser.add_argument(
+        "--include-nonstandard",
+        action="store_true",
+        help="Include non-standard options (adjusted for splits/mergers)"
+    )
+
     return parser.parse_args()
 
 
@@ -53,17 +76,24 @@ def main():
 
         # Initialize components
         db_manager = DatabaseManager(config)
-
-        # Pass the nonstandard flag to the analyzer
         analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
-        screener = OptionsScreener(analyzer)
-        presenter = OptionsPresenter()
 
-        # Generate and display report
-        funds = Decimal(str(args.funds))
-        screener.max_results = args.results
-        report = create_options_report(funds, screener, presenter)
-        print(report)
+        if args.command == 'puts':
+            screener = OptionsScreener(analyzer)
+            screener.max_results = args.results
+            presenter = OptionsPresenter()
+
+            # Generate and display report
+            funds = Decimal(str(args.funds))
+            report = create_options_report(funds, screener, presenter)
+            print(report)
+
+        elif args.command == 'calls':
+            report = create_covered_calls_report(args.symbol, analyzer)
+            print(report)
+
+        else:
+            print("Please specify a command: 'puts' or 'calls'")
 
     except Exception as e:
         logging.error(f"Error in options analysis: {e}")

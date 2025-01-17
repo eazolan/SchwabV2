@@ -23,6 +23,19 @@ class OptionMetrics:
         return self.premiums + self.exercise
 
 
+@dataclass
+class CoveredCallMetrics(OptionMetrics):
+    delta: float
+    theta: float
+    annual_return: Decimal
+    days_to_expiry: int
+
+    @property
+    def roi_if_called(self) -> Decimal:
+        """Calculate ROI if the option is exercised."""
+        return (self.premiums + self.exercise) / self.exercise * 100
+
+
 class OptionsAnalyzer:
     def __init__(self, db_manager, include_nonstandard=False):
         self.db = db_manager
@@ -32,7 +45,7 @@ class OptionsAnalyzer:
     def get_otm_options(self) -> List[Dict[str, Any]]:
         """Fetch out-of-the-money options from database."""
         # First query to get all options without filtering non-standard ones
-        base_query = """
+        base_query = f"""
             SELECT 
                 symbol, 
                 expirationDate, 
@@ -40,18 +53,16 @@ class OptionsAnalyzer:
                 bid, 
                 putCall, 
                 underlyingPrice,
-                option_symbol
-            FROM temp_options_table
+                option_symbol,
+                intrinsicValue
+            FROM {self.db.temp_puts_table}
             WHERE bid > 0
-            AND (
-                (putCall = 'CALL' AND strikePrice > underlyingPrice)
-                OR (putCall = 'PUT' AND strikePrice < underlyingPrice)
-            )
+            AND strikePrice < underlyingPrice
         """
 
         # Get total count before filtering
-        all_options = self.db.execute_query(base_query)
-        logger.info(f"Found {len(all_options)} total OTM options before filtering")
+        all_options = self.db.execute_query_puts(base_query)
+        logger.info(f"Found {len(all_options)} total options before filtering")
 
         if not self.include_nonstandard:
             # Add filter for non-standard options using GLOB to check for numbers
@@ -60,7 +71,7 @@ class OptionsAnalyzer:
             """
 
             # Get filtered results
-            results = self.db.execute_query(standard_query)
+            results = self.db.execute_query_puts(standard_query)
             filtered_count = len(results)
 
             # Log the filtering results
@@ -69,21 +80,19 @@ class OptionsAnalyzer:
                 logger.info(f"Filtered out {excluded_count} non-standard options")
 
                 # Log examples of what was filtered out
-                excluded_query = """
-                    SELECT DISTINCT symbol, option_symbol, putCall
-                    FROM temp_options_table
+                excluded_query = f"""
+                    SELECT DISTINCT symbol, option_symbol, putCall, intrinsicValue
+                    FROM {self.db.temp_puts_table}
                     WHERE bid > 0
                     AND SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
-                    AND (
-                        (putCall = 'CALL' AND strikePrice > underlyingPrice)
-                        OR (putCall = 'PUT' AND strikePrice < underlyingPrice)
-                    )
+                    AND strikePrice < underlyingPrice
                 """
-                excluded_examples = self.db.execute_query(excluded_query)
+                excluded_examples = self.db.execute_query_puts(excluded_query)
                 if excluded_examples:
                     logger.info("Examples of excluded non-standard options:")
                     for ex in excluded_examples:
-                        logger.info(f"  {ex['symbol']}: {ex['option_symbol']} ({ex['putCall']})")
+                        logger.info(
+                            f"  {ex['symbol']}: {ex['option_symbol']} ({ex['putCall']}) IV:{ex['intrinsicValue']}")
 
             logger.info(f"Returning {filtered_count} standard options for analysis")
             return results
@@ -92,6 +101,95 @@ class OptionsAnalyzer:
             logger.info(f"Returning all {len(all_options)} options for analysis")
             return all_options
 
+    def get_best_covered_calls(self, symbol: str) -> List[Dict[str, Any]]:
+        """
+        Analyze covered call options for a specific stock.
+
+        Args:
+            symbol: The stock symbol to analyze
+
+        Returns:
+            List of call options for the best strike price, showing all expiration dates up to 90 days
+        """
+        # First, get the current stock price
+        query = f"""
+            SELECT underlyingPrice
+            FROM {self.db.temp_calls_table}
+            WHERE symbol = ?
+            LIMIT 1
+        """
+        result = self.db.execute_query_calls(query, (symbol,))
+        if not result:
+            logger.error(f"No data found for symbol {symbol}")
+            return []
+
+        underlying_price = Decimal(str(result[0]['underlyingPrice']))
+        logger.info(f"Analyzing covered calls for {symbol} at price ${underlying_price}")
+
+        # Find the closest strike price below current price
+        strike_query = f"""
+            SELECT DISTINCT strikePrice
+            FROM {self.db.temp_calls_table}
+            WHERE symbol = ?
+            AND putCall = 'CALL'
+            AND strikePrice <= ?
+            ORDER BY strikePrice DESC
+            LIMIT 1
+        """
+        strike_result = self.db.execute_query_calls(strike_query, (symbol, float(underlying_price)))
+        if not strike_result:
+            logger.error(f"No valid strike prices found for {symbol}")
+            return []
+
+        target_strike = Decimal(str(strike_result[0]['strikePrice']))
+        logger.info(f"Selected strike price: ${target_strike}")
+
+        # Get all options at this strike price
+        base_query = f"""
+            SELECT 
+                symbol,
+                expirationDate,
+                strikePrice,
+                bid,
+                ask,
+                putCall,
+                underlyingPrice,
+                option_symbol,
+                daysToExpiration,
+                openInterest,
+                totalVolume,
+                delta,
+                theta
+            FROM {self.db.temp_calls_table}
+            WHERE symbol = ?
+            AND putCall = 'CALL'
+            AND strikePrice = ?
+            AND daysToExpiration > 0
+            AND bid > 0
+        """
+
+        if not self.include_nonstandard:
+            options_query = base_query + """
+            AND NOT SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
+            ORDER BY expirationDate ASC
+            """
+        else:
+            options_query = base_query + """
+            ORDER BY expirationDate ASC
+            """
+
+        results = self.db.execute_query_calls(options_query, (symbol, float(target_strike)))
+
+        if results:
+            logger.info(f"Found {len(results)} valid covered call options for analysis")
+            for opt in results:
+                logger.info(f"Option: {opt['expirationDate']} - ${opt['strikePrice']} "
+                            f"(bid: ${opt['bid']}, Delta: {opt['delta']}, OI: {opt['openInterest']})")
+        else:
+            logger.warning(f"No valid covered call options found for {symbol} "
+                           f"at strike ${target_strike}")
+
+        return results
 
     def calculate_metrics(self, option: Dict[str, Any], available_funds: Decimal) -> OptionMetrics:
         """Calculate relevant metrics for an option contract."""

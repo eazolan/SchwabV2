@@ -21,24 +21,29 @@ def setup_logging(config: Dict) -> None:
     log_file = Path(config['logging']['file'])
     log_file.parent.mkdir(exist_ok=True)
 
-    # Create a formatter with timestamps
-    default_formatter = logging.Formatter(
+    # Create formatters
+    file_formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-
-    # Configure handlers with the new formatter
-    file_handler = logging.FileHandler(str(log_file))
-    file_handler.setFormatter(default_formatter)
     
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(default_formatter)
+    console_formatter = logging.Formatter('%(message)s')
 
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, config['logging']['level']),
-        handlers=[file_handler, console_handler]
-    )
+    # Configure file handler (gets everything)
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(getattr(logging, config['logging']['level']))
+    
+    # Configure console handler (only gets results and errors)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.WARNING)  # Only show warnings and above
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, config['logging']['level']))
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
 
     # Create logger for the application
     logger = logging.getLogger('schwab_tracker')
