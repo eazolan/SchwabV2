@@ -85,7 +85,7 @@ def main():
 
             # Generate and display report
             funds = Decimal(str(args.funds))
-            report = create_options_report(funds, screener, presenter)
+            report = create_options_report(funds, screener, presenter, command='puts')  # Add command here
             print(report)
 
         elif args.command == 'calls':

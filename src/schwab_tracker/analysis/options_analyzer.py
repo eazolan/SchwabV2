@@ -9,30 +9,33 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class OptionMetrics:
-    symbol: str
-    expiration: str
-    option_type: str
-    strike: Decimal
-    contracts: int
-    premiums: Decimal
-    exercise: Decimal
+    delta: float = None
+    theta: float = None
+    annual_return: Decimal = None
+    days_to_expiry: int = None
+    symbol: str = None
+    expiration: str = None
+    option_type: str = None
+    strike: Decimal = None
+    contracts: int = None
+    premiums: Decimal = None
+    exercise: Decimal = None
 
     @property
     def profit_potential(self) -> Decimal:
         """Calculate potential profit from the option."""
+        if self.exercise is None:
+            return self.premiums
         return self.premiums + self.exercise
 
 
 @dataclass
 class CoveredCallMetrics(OptionMetrics):
-    delta: float
-    theta: float
-    annual_return: Decimal
-    days_to_expiry: int
-
     @property
     def roi_if_called(self) -> Decimal:
         """Calculate ROI if the option is exercised."""
+        if self.exercise is None or self.exercise == 0:
+            return Decimal('0')
         return (self.premiums + self.exercise) / self.exercise * 100
 
 

@@ -15,58 +15,85 @@ class TableFormat:
     alignments: List[str]  # '<' for left, '>' for right
 
 
+# Updated OptionsPresenter class for options_presenter.py
+
 class OptionsPresenter:
-    DEFAULT_FORMAT = TableFormat(
+    PUT_FORMAT = TableFormat(
+        headers=['Symbol', 'Expiration', 'Type', 'Strike', 'Contracts', 'Premium'],
+        widths=[10, 12, 6, 10, 11, 12],
+        alignments=['<', '<', '<', '>', '>', '>']
+    )
+
+    CALL_FORMAT = TableFormat(
         headers=['Symbol', 'Expiration', 'Type', 'Strike', 'Contracts', 'Premium', 'Exercise'],
         widths=[10, 12, 6, 10, 11, 12, 12],
         alignments=['<', '<', '<', '>', '>', '>', '>']
     )
 
-    def __init__(self, table_format: TableFormat = None):
-        self.format = table_format or self.DEFAULT_FORMAT
+    def __init__(self):
+        self.put_format = self.PUT_FORMAT
+        self.call_format = self.CALL_FORMAT
 
-    def format_options_table(self, options_data: Dict[str, List[OptionMetrics]]) -> str:
+    def format_options_table(self, options_data: Dict[str, List[OptionMetrics]], command: str = None) -> str:
         """Format options data into a readable table string."""
         output = []
 
-        # Only show PUT options
-        if 'PUT' in options_data:
+        # Only show PUT options if 'puts' command is used
+        if command == 'puts' and 'PUT' in options_data:
             output.append("\nPUT Options:")
-            output.append(self._format_header())
-            output.append(self._format_separator())
-
+            output.append(self._format_header('PUT'))
+            output.append(self._format_separator('PUT'))
             for option in options_data['PUT']:
-                output.append(self._format_option_row(option))
+                output.append(self._format_option_row(option, 'PUT'))
+
+        # Only show CALL options if 'calls' command is used
+        elif command == 'calls' and 'CALL' in options_data:
+            output.append("\nCALL Options:")
+            output.append(self._format_header('CALL'))
+            output.append(self._format_separator('CALL'))
+            for option in options_data['CALL']:
+                output.append(self._format_option_row(option, 'CALL'))
 
         return "\n".join(output)
 
-    def _format_header(self) -> str:
+    def _format_header(self, option_type: str) -> str:
         """Create the table header."""
+        format_obj = self.put_format if option_type == 'PUT' else self.call_format
         return "".join(
             f"{header:{align}{width}}"
             for header, width, align in zip(
-                self.format.headers,
-                self.format.widths,
-                self.format.alignments
+                format_obj.headers,
+                format_obj.widths,
+                format_obj.alignments
             )
         )
 
-    def _format_separator(self) -> str:
+    def _format_separator(self, option_type: str) -> str:
         """Create the separator line."""
-        return "-" * sum(self.format.widths)
+        format_obj = self.put_format if option_type == 'PUT' else self.call_format
+        return "-" * sum(format_obj.widths)
 
-    def _format_option_row(self, option: OptionMetrics) -> str:
+    def _format_option_row(self, option: OptionMetrics, option_type: str) -> str:
         """Format a single option row."""
-        return "".join([
-            f"{option.symbol:<{self.format.widths[0]}}",
-            f"{option.expiration[:10]:<{self.format.widths[1]}}",
-            f"{option.option_type:<{self.format.widths[2]}}",
-            f"{option.strike:>{self.format.widths[3]}.2f}",
-            f"{option.contracts:>{self.format.widths[4]}}",
-            f"{option.premiums:>{self.format.widths[5]}.0f}",
-            f"{option.exercise:>{self.format.widths[6]}.0f}"
-        ])
-
+        if option_type == 'PUT':
+            return "".join([
+                f"{option.symbol:<{self.put_format.widths[0]}}",
+                f"{option.expiration[:10]:<{self.put_format.widths[1]}}",
+                f"{option.option_type:<{self.put_format.widths[2]}}",
+                f"{option.strike:>{self.put_format.widths[3]}.2f}",
+                f"{option.contracts:>{self.put_format.widths[4]}}",
+                f"{option.premiums:>{self.put_format.widths[5]}.0f}"
+            ])
+        else:
+            return "".join([
+                f"{option.symbol:<{self.call_format.widths[0]}}",
+                f"{option.expiration[:10]:<{self.call_format.widths[1]}}",
+                f"{option.option_type:<{self.call_format.widths[2]}}",
+                f"{option.strike:>{self.call_format.widths[3]}.2f}",
+                f"{option.contracts:>{self.call_format.widths[4]}}",
+                f"{option.premiums:>{self.call_format.widths[5]}.0f}",
+                f"{option.exercise:>{self.call_format.widths[6]}.0f}"
+            ])
 
 class CoveredCallPresenter:
     DEFAULT_FORMAT = TableFormat(
@@ -125,11 +152,11 @@ class CoveredCallPresenter:
         ])
 
 
-def create_options_report(funds: Decimal, screener, presenter) -> str:
+def create_options_report(funds: Decimal, screener, presenter, command: str = None) -> str:
     """Generate a complete options analysis report."""
     try:
         best_options = screener.find_best_options(funds)
-        formatted_table = presenter.format_options_table(best_options)
+        formatted_table = presenter.format_options_table(best_options, command)
 
         return f"""
 Options Analysis Report
