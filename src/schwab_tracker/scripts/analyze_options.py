@@ -28,7 +28,7 @@ def parse_arguments():
         description="Analyze options based on available funds"
     )
 
-    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+    subparsers = parser.add_subparsers(dest='command', required=True, help='Command to run')
 
     # Put options analysis
     puts_parser = subparsers.add_parser('puts', help='Analyze put options')
@@ -76,9 +76,9 @@ def main():
 
         # Initialize components
         db_manager = DatabaseManager(config)
-        analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
 
         if args.command == 'puts':
+            analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
             screener = OptionsScreener(analyzer)
             screener.max_results = args.results
             presenter = OptionsPresenter()
@@ -89,6 +89,7 @@ def main():
             print(report)
 
         elif args.command == 'calls':
+            analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
             report = create_covered_calls_report(args.symbol, analyzer)
             print(report)
 

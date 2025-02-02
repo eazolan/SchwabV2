@@ -1,8 +1,6 @@
-import os
 import logging
 from pathlib import Path
 import yaml
-from dotenv import load_dotenv
 import time
 from datetime import datetime
 import sqlite3
@@ -14,7 +12,37 @@ from schwab_tracker.utils.logging_config import setup_logging
 logger = logging.getLogger(__name__)
 
 
-def get_quotes(client, db_manager, config):  
+def retry_api_call(func, *args, base_delay, max_retries=1, **kwargs):
+    """
+    Helper function to retry API calls with temporary increased delay.
+
+    Args:
+        func: The API function to call
+        base_delay: The original rate limit delay
+        max_retries: Maximum number of retry attempts
+        *args, **kwargs: Arguments to pass to the function
+
+    Returns:
+        The API response if successful
+
+    Raises:
+        Exception: If all retry attempts fail
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if attempt == max_retries:
+                raise
+
+            # Increase delay by 0.5 seconds for retry
+            temp_delay = base_delay + 0.5
+            logger.warning(f"API call failed. Retrying with increased delay ({temp_delay}s): {str(e)}")
+            time.sleep(temp_delay)
+            continue
+
+
+def get_quotes(client, db_manager, config):
     """Get quotes for all active symbols and store in database."""
     try:
         # Log database paths explicitly
@@ -22,7 +50,7 @@ def get_quotes(client, db_manager, config):
         logger.info(f"Destination DB: {db_manager.stock_db_path}")
         batch_size = config['api']['batch_size']  # Use configured batch size
         rate_limit_delay = config['api']['rate_limit_delay']  # Get configured delay
-        
+
         # Verify source database
         with database_connection(db_manager.active_stocks_db_path) as conn_source:
             cursor_source = conn_source.cursor()
@@ -33,11 +61,11 @@ def get_quotes(client, db_manager, config):
         # Verify destination database before operations
         with database_connection(db_manager.stock_db_path) as conn_dest:
             cursor_dest = conn_dest.cursor()
-            
+
             # Log table drop
             logger.info("Dropping existing stock_data table...")
             cursor_dest.execute('DROP TABLE IF EXISTS stock_data')
-            
+
             # Log table creation
             logger.info("Creating new stock_data table...")
             cursor_dest.execute('''
@@ -55,7 +83,7 @@ def get_quotes(client, db_manager, config):
                 )
             ''')
             conn_dest.commit()  # Commit table creation explicitly
-            
+
             # Verify table exists
             cursor_dest.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_data'")
             if cursor_dest.fetchone():
@@ -68,23 +96,28 @@ def get_quotes(client, db_manager, config):
 
             for i in range(0, len(all_symbols), batch_size):
                 batch = all_symbols[i:i + batch_size]
-                logger.info(f"Processing batch {(i//batch_size)+1} of {(len(all_symbols)-1)//batch_size + 1}")
+                logger.info(f"Processing batch {(i // batch_size) + 1} of {(len(all_symbols) - 1) // batch_size + 1}")
 
                 try:
-                    response = client.get_quotes(batch)
+                    # Modified to use retry mechanism
+                    response = retry_api_call(
+                        client.get_quotes,
+                        batch,
+                        base_delay=rate_limit_delay
+                    )
                     quotes_data = response.json()
-                    
+
                     # Log response size
                     logger.info(f"Received data for {len(quotes_data)} symbols")
 
                     timestamp = datetime.now().isoformat()
-                    
+
                     rows_in_batch = 0
                     for symbol, data in quotes_data.items():
                         try:
                             fundamental = data.get('fundamental', {})
                             quote = data.get('quote', {})
-                            
+
                             cursor_dest.execute('''
                                 INSERT INTO stock_data (
                                     symbol, timestamp, asset_main_type, asset_sub_type,
@@ -131,8 +164,8 @@ def get_quotes(client, db_manager, config):
     except Exception as e:
         logger.error(f"Error in get_quotes: {e}", exc_info=True)
         raise
-        
-        
+
+
 def populate_options_table(client, db_manager, config):  # Added config parameter
     """Populate options data table with chains for high-volume stocks."""
     start_time = time.time()
@@ -197,14 +230,17 @@ def populate_options_table(client, db_manager, config):  # Added config paramete
                 try:
                     print(f"\nProcessing {symbol}...")
 
-                    response = client.get_option_chains(
+                    # Modified to use retry mechanism
+                    response = retry_api_call(
+                        client.get_option_chains,
                         symbol,
+                        base_delay=rate_limit_delay,
                         contractType="ALL",
                         strikeCount=10,
                         strategy="SINGLE",
                         includeUnderlyingQuote=True
                     )
-                    
+
                     chain_data = response.json()
                     timestamp = datetime.now().isoformat()
 
@@ -291,6 +327,7 @@ def populate_options_table(client, db_manager, config):  # Added config paramete
         elapsed_time = time.time() - start_time
         print(f"\nTotal execution time: {elapsed_time:.2f} seconds")
 
+
 def main():
     """Main entry point for data collection."""
     try:
@@ -315,11 +352,13 @@ def main():
         logger.error(f"Error in data collection: {e}")
         raise
 
+
 def load_config():
     """Load configuration from YAML file."""
     config_path = Path(__file__).resolve().parent.parent.parent.parent / 'config' / 'config.yml'
     with open(config_path) as f:
         return yaml.safe_load(f)
+
 
 if __name__ == "__main__":
     main()
