@@ -90,7 +90,8 @@ def main():
 
         elif args.command == 'calls':
             analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
-            report = create_covered_calls_report(args.symbol, analyzer)
+            symbol = args.symbol.upper()  # Capitalize the stock symbol
+            report = create_covered_calls_report(symbol, analyzer)
             print(report)
 
         else:
