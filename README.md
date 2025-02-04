@@ -2,6 +2,13 @@
 
 A Python tool for analyzing Schwab API data and options. Collects active stock data, fetches current prices and options chains, and analyzes option opportunities based on available funds.
 
+## Discord Bot Integration
+
+These scripts can be automated and controlled remotely using [ScriptRunnerTodd](https://github.com/eazolan/ScriptRunnerTodd), a Discord bot specifically designed to work with this project. The bot allows you to:
+- Trigger analysis scripts from Discord
+- Receive results directly in your Discord channel
+- Monitor script execution status
+
 ## Installation
 
 Clone the repository and install in development mode:
