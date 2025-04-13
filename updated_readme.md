@@ -73,7 +73,7 @@ analyze-options puts -f 25000 -r 10
 
 For PUT options expiring on a specific date:
 ```bash
-analyze-options puts -f 25000 -d 2025-04-25 -r 20
+analyze-options puts -f 25000 -d 2025-04-25
 ```
 
 For covered call opportunities on a specific stock:
@@ -133,14 +133,14 @@ COMMIT;
 ### PUT Options Analysis
 Shows:
 - Symbol
-- Expiration date (next Friday only)
+- Expiration date (next Friday by default, or custom date if specified)
 - Strike price
 - Number of contracts possible with funds
 - Premium (potential income)
 - Exercise value
 
 Options are filtered for:
-- Expiring next Friday
+- Expiring on the target date (next Friday by default)
 - Out-of-the-money only
 - Stocks with sufficient volume
 - Prices above $5

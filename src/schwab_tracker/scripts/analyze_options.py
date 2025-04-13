@@ -49,6 +49,11 @@ def parse_arguments():
         action="store_true",
         help="Include non-standard options (adjusted for splits/mergers)"
     )
+    puts_parser.add_argument(
+        "-d", "--date",
+        type=str,
+        help="Specify expiration date in YYYY-MM-DD format (default: next Friday)"
+    )
 
     # Covered calls analysis
     calls_parser = subparsers.add_parser('calls', help='Analyze covered calls')
@@ -78,14 +83,15 @@ def main():
         db_manager = DatabaseManager(config)
 
         if args.command == 'puts':
-            analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
+            analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard, 
+                                       custom_date=args.date)  # Pass custom date
             screener = OptionsScreener(analyzer)
             screener.max_results = args.results
             presenter = OptionsPresenter()
 
             # Generate and display report
             funds = Decimal(str(args.funds))
-            report = create_options_report(funds, screener, presenter, command='puts')  # Add command here
+            report = create_options_report(funds, screener, presenter, command='puts')
             print(report)
 
         elif args.command == 'calls':

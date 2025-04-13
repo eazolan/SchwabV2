@@ -40,10 +40,11 @@ class CoveredCallMetrics(OptionMetrics):
 
 
 class OptionsAnalyzer:
-    def __init__(self, db_manager, include_nonstandard=False):
+    def __init__(self, db_manager, include_nonstandard=False, custom_date=None):
         self.db = db_manager
         self.include_nonstandard = include_nonstandard
-        logger.info(f"OptionsAnalyzer initialized with include_nonstandard={include_nonstandard}")
+        self.custom_date = custom_date
+        logger.info(f"OptionsAnalyzer initialized with include_nonstandard={include_nonstandard}, custom_date={custom_date}")
 
     def get_otm_options(self) -> List[Dict[str, Any]]:
         """Fetch out-of-the-money options from database."""
@@ -64,7 +65,7 @@ class OptionsAnalyzer:
         """
 
         # Get total count before filtering
-        all_options = self.db.execute_query_puts(base_query)
+        all_options = self.db.execute_query_puts(base_query, custom_date=self.custom_date)
         logger.info(f"Found {len(all_options)} total options before filtering")
 
         if not self.include_nonstandard:
@@ -74,7 +75,7 @@ class OptionsAnalyzer:
             """
 
             # Get filtered results
-            results = self.db.execute_query_puts(standard_query)
+            results = self.db.execute_query_puts(standard_query, custom_date=self.custom_date)
             filtered_count = len(results)
 
             # Log the filtering results
@@ -90,7 +91,7 @@ class OptionsAnalyzer:
                     AND SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
                     AND strikePrice < underlyingPrice
                 """
-                excluded_examples = self.db.execute_query_puts(excluded_query)
+                excluded_examples = self.db.execute_query_puts(excluded_query, custom_date=self.custom_date)
                 if excluded_examples:
                     logger.info("Examples of excluded non-standard options:")
                     for ex in excluded_examples:
