@@ -133,14 +133,14 @@ COMMIT;
 ### PUT Options Analysis
 Shows:
 - Symbol
-- Expiration date (next Friday only)
+- Expiration date
 - Strike price
 - Number of contracts possible with funds
 - Premium (potential income)
 - Exercise value
 
 Options are filtered for:
-- Expiring next Friday
+- Expiration date (Default next Friday, or user specified.)
 - Out-of-the-money only
 - Stocks with sufficient volume
 - Prices above $5
