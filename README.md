@@ -20,6 +20,37 @@ pip install setuptools
 pip install -e .
 ```
 
+## Creating an Executable
+
+You can create a standalone executable of this application using PyInstaller within a virtual environment:
+
+1. Set up a virtual environment (if not already done):
+```bash
+python -m venv .venv
+```
+
+2. Activate the virtual environment:
+```bash
+# On Windows
+.venv\Scripts\activate
+```
+```bash
+# On Unix/MacOS
+source .venv/bin/activate
+```
+
+3. Install required dependencies:
+```bash
+pip install -e .
+pip install pyinstaller
+```
+4. Create the executable:
+```bash
+pyinstaller --onefile src/schwab_tracker/scripts/analyze_options.py --name analyze-options
+pyinstaller --onefile src/schwab_tracker/scripts/collect_data.py --name collect-data
+pyinstaller --onefile src/schwab_tracker/scripts/get_symbols.py --name get-symbols
+```
+
 ## Configuration
 
 You must have a "Market Data Production" API product from Charles-Schwab. 
