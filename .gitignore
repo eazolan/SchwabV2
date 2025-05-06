@@ -29,6 +29,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.venv/
 
 # IDE specific files
 .idea/
