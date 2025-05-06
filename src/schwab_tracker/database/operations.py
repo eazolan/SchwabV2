@@ -114,6 +114,37 @@ class DatabaseManager:
 
             conn.commit()
 
+    def ensure_calls_table_exists(self):
+        """Ensure that the calls view exists in the database."""
+        with database_connection(self.stock_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE VIEW IF NOT EXISTS calls_options AS
+                SELECT 
+                    o.symbol,
+                    o.expiration,
+                    o.strike,
+                    o.option_type,
+                    o.bid,
+                    o.ask,
+                    o.last,
+                    o.volume,
+                    o.open_interest,
+                    o.delta,
+                    o.gamma,
+                    o.theta,
+                    o.vega,
+                    o.rho,
+                    o.implied_volatility,
+                    o.is_non_standard,
+                    p.price as stock_price,
+                    p.updated_at as price_updated_at
+                FROM options o
+                JOIN prices p ON o.symbol = p.symbol
+                WHERE o.option_type = 'CALL'
+            """)
+            conn.commit()
+
     def execute_query_puts(self, query: str, params: tuple = (), custom_date=None) -> List[Dict[str, Any]]:
         """Execute a query against the puts table and return results as a list of dictionaries."""
         try:
