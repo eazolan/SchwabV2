@@ -115,35 +115,65 @@ class DatabaseManager:
             conn.commit()
 
     def ensure_calls_table_exists(self):
-        """Ensure that the calls view exists in the database."""
+        """Ensure temporary calls table exists and is populated with options."""
         with database_connection(self.stock_db_path) as conn:
             cursor = conn.cursor()
+
             cursor.execute("""
-                CREATE VIEW IF NOT EXISTS calls_options AS
-                SELECT 
-                    o.symbol,
-                    o.expiration,
-                    o.strike,
-                    o.option_type,
-                    o.bid,
-                    o.ask,
-                    o.last,
-                    o.volume,
-                    o.open_interest,
-                    o.delta,
-                    o.gamma,
-                    o.theta,
-                    o.vega,
-                    o.rho,
-                    o.implied_volatility,
-                    o.is_non_standard,
-                    p.price as stock_price,
-                    p.updated_at as price_updated_at
-                FROM options o
-                JOIN prices p ON o.symbol = p.symbol
-                WHERE o.option_type = 'CALL'
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='option_chains'
             """)
+
+            if not cursor.fetchone():
+                raise ValueError("options_chains table does not exist. Please run data collection first.")
+
+            # Create temp table
+            cursor.execute(f'DROP TABLE IF EXISTS {self.temp_calls_table}')
+
+            # Create the table for CALL options - include ALL columns from option_chains
+            cursor.execute(f"""
+                CREATE TABLE {self.temp_calls_table} AS 
+                SELECT 
+                    symbol,
+                    timestamp,
+                    putCall,
+                    option_symbol,
+                    description,
+                    bid,
+                    ask,
+                    last,
+                    mark,
+                    bidSize,
+                    askSize,
+                    totalVolume,
+                    openInterest,
+                    volatility,
+                    delta,
+                    gamma,
+                    theta,
+                    vega,
+                    rho,
+                    strikePrice,
+                    expirationDate,
+                    daysToExpiration,
+                    inTheMoney,
+                    theoreticalOptionValue,
+                    timeValue,
+                    intrinsicValue,
+                    multiplier,
+                    underlyingPrice
+                FROM option_chains
+                WHERE putCall = 'CALL'
+                AND bid > 0
+                AND underlyingPrice > 5
+            """)
+
+            cursor.execute(f"SELECT COUNT(*) FROM {self.temp_calls_table}")
+            row_count = cursor.fetchone()[0]
+            logger.info(f"Created temporary CALLS table with {row_count} rows")
+
             conn.commit()
+
 
     def execute_query_puts(self, query: str, params: tuple = (), custom_date=None) -> List[Dict[str, Any]]:
         """Execute a query against the puts table and return results as a list of dictionaries."""
