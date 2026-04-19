@@ -84,6 +84,11 @@ def parse_arguments():
         help="Number of results to display (default: 10)"
     )
     volatility_parser.add_argument(
+        "-i", "--index",
+        type=str,
+        help="Filter by index (e.g., SP500)"
+    )
+    volatility_parser.add_argument(
         "--include-nonstandard",
         action="store_true",
         help="Include non-standard options (adjusted for splits/mergers)"
@@ -123,7 +128,8 @@ def main():
 
         elif args.command == 'volatility':
             analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
-            report = create_volatility_report(args.date, analyzer, args.results)
+            index_filter = args.index if hasattr(args, 'index') else None
+            report = create_volatility_report(args.date, analyzer, args.results, index_filter)
             print(report)
 
         else:

@@ -231,21 +231,25 @@ class VolatilityPresenter:
         ])
 
 
-def create_volatility_report(expiration_date: str, analyzer, limit: int = 10) -> str:
+def create_volatility_report(expiration_date: str, analyzer, limit: int = 10, index_filter: str = None) -> str:
     """Generate a complete volatility analysis report."""
     try:
-        options_data = analyzer.get_most_volatile_calls(expiration_date, limit)
+        options_data = analyzer.get_most_volatile_calls(expiration_date, limit, index_filter)
         
         if not options_data:
+            if index_filter:
+                return f"No volatile call options found for expiration date {expiration_date} in {index_filter}"
             return f"No volatile call options found for expiration date {expiration_date}"
 
         presenter = VolatilityPresenter()
         formatted_table = presenter.format_volatility_table(options_data)
+        
+        index_info = f"\nIndex Filter: {index_filter}" if index_filter else ""
 
         return f"""
 Volatility Analysis Report
 --------------------------
-Expiration Date: {expiration_date}
+Expiration Date: {expiration_date}{index_info}
 Number of Results: {len(options_data)}
 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 

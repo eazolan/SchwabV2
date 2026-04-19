@@ -85,10 +85,14 @@ You'll be good to go after that. You should not need to jump through these hoops
 
 The workflow consists of three steps:
 
-1. Get list of active stocks:
+1. Get list of active stocks and index memberships:
 ```bash
 get-symbols
 ```
+This command:
+- Fetches all active stocks from AlphaVantage and stores them in `ActiveStocks.db`
+- Fetches current S&P 500 constituents from GitHub and stores them in `BasicStockData.db`
+- Tracks index membership history (additions and removals)
 
 2. Collect current market data:
 ```bash
@@ -99,7 +103,7 @@ collect-data
 
 For PUT options based on available funds:
 ```bash
-analyze-options puts -f 25000 -r 10
+analyze-options puts -f 25000 -r 5
 ```
 
 For PUT options expiring on a specific date:
@@ -114,7 +118,12 @@ analyze-options calls SYMBOL
 
 For most volatile CALL options on a specific date:
 ```bash
-analyze-options volatility -d 2026-05-01 -r 10
+analyze-options volatility -d 2026-05-01 -r 12
+```
+
+For most volatile CALL options filtered by index (e.g., S&P 500 only):
+```bash
+analyze-options volatility -d 2026-05-01 -i SP500 -r 25
 ```
 
 Parameters for PUT analysis:
@@ -130,6 +139,7 @@ Parameters for covered calls analysis:
 Parameters for volatility analysis:
 - `-d, --date`: Expiration date in YYYY-MM-DD format (required)
 - `-r, --results`: Number of top results to display (default: 10)
+- `-i, --index`: Filter by index membership (e.g., SP500). Optional - omit to include all stocks.
 - `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers)
 
 ## Folder Structure
@@ -167,6 +177,40 @@ CREATE TABLE all_active_stocks (
                 assetType TEXT 
             );
 COMMIT;
+```
+
+## Index Membership Tracking
+
+The `get-symbols` command also creates and maintains an `index_memberships` table in `BasicStockData.db` that tracks which stocks belong to market indexes like the S&P 500.
+
+### SQL for the `index_memberships` table in `BasicStockData.db`
+
+```sql
+CREATE TABLE index_memberships (
+    symbol TEXT NOT NULL,
+    index_name TEXT NOT NULL,
+    added_date DATE,
+    removed_date DATE,
+    PRIMARY KEY (symbol, index_name, added_date)
+);
+```
+
+The table tracks:
+- `symbol`: Stock ticker symbol
+- `index_name`: Name of the index (e.g., 'SP500')
+- `added_date`: Date the stock was added to the index
+- `removed_date`: Date the stock was removed (NULL if still active)
+
+### Querying Index Membership
+
+```sql
+-- Get all current S&P 500 stocks
+SELECT symbol FROM index_memberships 
+WHERE index_name = 'SP500' AND removed_date IS NULL;
+
+-- Check if a specific stock is in S&P 500
+SELECT * FROM index_memberships 
+WHERE symbol = 'AAPL' AND index_name = 'SP500' AND removed_date IS NULL;
 ```
 
 ## Output Format
@@ -214,3 +258,4 @@ Options are filtered for:
 - Underlying price > $5
 - One result per symbol (lowest strike price)
 - Standard options only (unless --include-nonstandard is specified)
+- Optional index filter (e.g., -i SP500 for S&P 500 stocks only)

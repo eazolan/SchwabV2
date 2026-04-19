@@ -195,13 +195,14 @@ class OptionsAnalyzer:
 
         return results
 
-    def get_most_volatile_calls(self, expiration_date: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_most_volatile_calls(self, expiration_date: str, limit: int = 10, index_filter: str = None) -> List[Dict[str, Any]]:
         """
         Get the most volatile CALL options for a specific expiration date.
 
         Args:
             expiration_date: Expiration date in YYYY-MM-DD format
             limit: Number of results to return (default: 10)
+            index_filter: Optional index name to filter by (e.g., 'SP500')
 
         Returns:
             List of call options sorted by volatility (highest first)
@@ -224,6 +225,17 @@ class OptionsAnalyzer:
                 oc.daysToExpiration
             FROM option_chains oc
             INNER JOIN stock_data sd ON oc.symbol = sd.symbol
+        """
+        
+        # Add index filter if specified
+        if index_filter:
+            base_query += """
+            INNER JOIN index_memberships im ON oc.symbol = im.symbol
+                AND im.index_name = ?
+                AND im.removed_date IS NULL
+            """
+        
+        base_query += """
             INNER JOIN (
                 SELECT symbol, MIN(strikePrice) as min_strike
                 FROM option_chains
@@ -256,10 +268,18 @@ class OptionsAnalyzer:
             LIMIT ?
         """
 
-        # Pass expiration_date twice (once for subquery, once for main query) plus limit
-        results = self.db.execute_query_volatility(base_query, (expiration_date, expiration_date, limit))
+        # Build parameters list based on whether index filter is used
+        if index_filter:
+            params = (index_filter, expiration_date, expiration_date, limit)
+        else:
+            params = (expiration_date, expiration_date, limit)
         
-        logger.info(f"Found {len(results)} volatile CALL options for {expiration_date}")
+        results = self.db.execute_query_volatility(base_query, params)
+        
+        if index_filter:
+            logger.info(f"Found {len(results)} volatile CALL options for {expiration_date} in {index_filter}")
+        else:
+            logger.info(f"Found {len(results)} volatile CALL options for {expiration_date}")
         
         return results
 
