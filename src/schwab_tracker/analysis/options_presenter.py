@@ -152,16 +152,18 @@ class CoveredCallPresenter:
         ])
 
 
-def create_options_report(funds: Decimal, screener, presenter, command: str = None) -> str:
+def create_options_report(funds: Decimal, screener, presenter, command: str = None, index_filter: str = None) -> str:
     """Generate a complete options analysis report."""
     try:
         best_options = screener.find_best_options(funds)
         formatted_table = presenter.format_options_table(best_options, command)
+        
+        index_info = f"\nIndex Filter: {index_filter}" if index_filter else ""
 
         return f"""
 Options Analysis Report
 ----------------------
-Available Funds: ${funds:,.2f}
+Available Funds: ${funds:,.2f}{index_info}
 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 {formatted_table}

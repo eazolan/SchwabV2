@@ -40,42 +40,77 @@ class CoveredCallMetrics(OptionMetrics):
 
 
 class OptionsAnalyzer:
-    def __init__(self, db_manager, include_nonstandard=False, custom_date=None):
+    def __init__(self, db_manager, include_nonstandard=False, custom_date=None, index_filter=None):
         self.db = db_manager
         self.include_nonstandard = include_nonstandard
         self.custom_date = custom_date
-        logger.info(f"OptionsAnalyzer initialized with include_nonstandard={include_nonstandard}, custom_date={custom_date}")
+        self.index_filter = index_filter
+        logger.info(f"OptionsAnalyzer initialized with include_nonstandard={include_nonstandard}, custom_date={custom_date}, index_filter={index_filter}")
 
     def get_otm_options(self) -> List[Dict[str, Any]]:
         """Fetch out-of-the-money options from database."""
-        # First query to get all options without filtering non-standard ones
-        base_query = f"""
-            SELECT 
-                symbol, 
-                expirationDate, 
-                strikePrice, 
-                bid, 
-                putCall, 
-                underlyingPrice,
-                option_symbol,
-                intrinsicValue
-            FROM {self.db.temp_puts_table}
-            WHERE bid > 0
-            AND strikePrice < underlyingPrice
-        """
+        # Build base query with optional index filter
+        if self.index_filter:
+            base_query = f"""
+                SELECT 
+                    p.symbol, 
+                    p.expirationDate, 
+                    p.strikePrice, 
+                    p.bid, 
+                    p.putCall, 
+                    p.underlyingPrice,
+                    p.option_symbol,
+                    p.intrinsicValue
+                FROM {self.db.temp_puts_table} p
+                INNER JOIN index_memberships im ON p.symbol = im.symbol
+                    AND im.index_name = ?
+                    AND im.removed_date IS NULL
+                WHERE p.bid > 0
+                AND p.strikePrice < p.underlyingPrice
+            """
+        else:
+            base_query = f"""
+                SELECT 
+                    symbol, 
+                    expirationDate, 
+                    strikePrice, 
+                    bid, 
+                    putCall, 
+                    underlyingPrice,
+                    option_symbol,
+                    intrinsicValue
+                FROM {self.db.temp_puts_table}
+                WHERE bid > 0
+                AND strikePrice < underlyingPrice
+            """
 
         # Get total count before filtering
-        all_options = self.db.execute_query_puts(base_query, custom_date=self.custom_date)
-        logger.info(f"Found {len(all_options)} total options before filtering")
+        if self.index_filter:
+            all_options = self.db.execute_query_puts(base_query, params=(self.index_filter,), custom_date=self.custom_date)
+        else:
+            all_options = self.db.execute_query_puts(base_query, custom_date=self.custom_date)
+        
+        if self.index_filter:
+            logger.info(f"Found {len(all_options)} total options for {self.index_filter} before filtering")
+        else:
+            logger.info(f"Found {len(all_options)} total options before filtering")
 
         if not self.include_nonstandard:
             # Add filter for non-standard options using GLOB to check for numbers
-            standard_query = base_query + """
-            AND NOT SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
-            """
+            if self.index_filter:
+                standard_query = base_query.replace("p.option_symbol", "p.option_symbol") + """
+                AND NOT SUBSTR(p.option_symbol, 1, 6) GLOB '*[0-9]*'
+                """
+            else:
+                standard_query = base_query + """
+                AND NOT SUBSTR(option_symbol, 1, 6) GLOB '*[0-9]*'
+                """
 
             # Get filtered results
-            results = self.db.execute_query_puts(standard_query, custom_date=self.custom_date)
+            if self.index_filter:
+                results = self.db.execute_query_puts(standard_query, params=(self.index_filter,), custom_date=self.custom_date)
+            else:
+                results = self.db.execute_query_puts(standard_query, custom_date=self.custom_date)
             filtered_count = len(results)
 
             # Log the filtering results

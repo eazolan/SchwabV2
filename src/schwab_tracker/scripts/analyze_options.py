@@ -46,6 +46,11 @@ def parse_arguments():
         help="Number of top results to display (default: 10)"
     )
     puts_parser.add_argument(
+        "-i", "--index",
+        type=str,
+        help="Filter by index (e.g., SP500)"
+    )
+    puts_parser.add_argument(
         "--include-nonstandard",
         action="store_true",
         help="Include non-standard options (adjusted for splits/mergers)"
@@ -109,15 +114,16 @@ def main():
         db_manager = DatabaseManager(config)
 
         if args.command == 'puts':
+            index_filter = args.index if hasattr(args, 'index') else None
             analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard, 
-                                       custom_date=args.date)  # Pass custom date
+                                       custom_date=args.date, index_filter=index_filter)
             screener = OptionsScreener(analyzer)
             screener.max_results = args.results
             presenter = OptionsPresenter()
 
             # Generate and display report
             funds = Decimal(str(args.funds))
-            report = create_options_report(funds, screener, presenter, command='puts')
+            report = create_options_report(funds, screener, presenter, command='puts', index_filter=index_filter)
             print(report)
 
         elif args.command == 'calls':

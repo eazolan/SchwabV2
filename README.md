@@ -111,6 +111,11 @@ For PUT options expiring on a specific date:
 analyze-options puts -f 25000 -d 2025-04-25 -r 20
 ```
 
+For PUT options filtered by index (e.g., S&P 500 only):
+```bash
+analyze-options puts -f 25000 -i SP500 -r 10
+```
+
 For covered call opportunities on a specific stock:
 ```bash
 analyze-options calls SYMBOL
@@ -129,6 +134,7 @@ analyze-options volatility -d 2026-05-01 -i SP500 -r 25
 Parameters for PUT analysis:
 - `-f, --funds`: Available funds for trading
 - `-r, --results`: Number of top results to display (default: 10)
+- `-i, --index`: Filter by index membership (e.g., SP500). Optional - omit to include all stocks.
 - `-d, --date`: Specify expiration date in YYYY-MM-DD format (default: next Friday). Useful for holidays when exchanges are closed on Friday (e.g., Good Friday).
 - `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers). By default, these are filtered out.
 
