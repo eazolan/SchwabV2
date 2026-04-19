@@ -203,6 +203,28 @@ class DatabaseManager:
             logger.error(f"Database error: {e}")
             raise
 
+    def execute_query_volatility(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
+        """Execute a query directly against the option_chains table for volatility analysis."""
+        try:
+            with database_connection(self.stock_db_path) as conn:
+                # Check if option_chains table exists
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' AND name='option_chains'
+                """)
+                
+                if not cursor.fetchone():
+                    raise ValueError("option_chains table does not exist. Please run data collection first.")
+                
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logger.error(f"Database error: {e}")
+            raise
+
     def get_otm_options(self, custom_date=None) -> List[Dict[str, Any]]:
         """Get out-of-the-money PUT options from the temporary table."""
         query = f"""

@@ -195,6 +195,74 @@ class OptionsAnalyzer:
 
         return results
 
+    def get_most_volatile_calls(self, expiration_date: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get the most volatile CALL options for a specific expiration date.
+
+        Args:
+            expiration_date: Expiration date in YYYY-MM-DD format
+            limit: Number of results to return (default: 10)
+
+        Returns:
+            List of call options sorted by volatility (highest first)
+        """
+        base_query = """
+            SELECT 
+                oc.symbol,
+                oc.expirationDate,
+                oc.strikePrice,
+                oc.bid,
+                oc.ask,
+                oc.volatility,
+                oc.delta,
+                oc.theta,
+                oc.gamma,
+                oc.underlyingPrice,
+                oc.option_symbol,
+                oc.openInterest,
+                oc.totalVolume,
+                oc.daysToExpiration
+            FROM option_chains oc
+            INNER JOIN stock_data sd ON oc.symbol = sd.symbol
+            INNER JOIN (
+                SELECT symbol, MIN(strikePrice) as min_strike
+                FROM option_chains
+                WHERE putCall = 'CALL'
+                AND date(expirationDate) = ?
+                AND volatility IS NOT NULL
+                AND bid > 0
+                AND underlyingPrice > 5
+                AND strikePrice > underlyingPrice
+                AND (openInterest > 0 OR totalVolume > 0)
+                GROUP BY symbol
+            ) min_strikes ON oc.symbol = min_strikes.symbol AND oc.strikePrice = min_strikes.min_strike
+            WHERE oc.putCall = 'CALL'
+            AND date(oc.expirationDate) = ?
+            AND oc.volatility IS NOT NULL
+            AND oc.bid > 0
+            AND oc.underlyingPrice > 5
+            AND oc.strikePrice > oc.underlyingPrice
+            AND sd.fund_avg_10day_volume > 1000000
+            AND (oc.openInterest > 0 OR oc.totalVolume > 0)
+        """
+
+        if not self.include_nonstandard:
+            base_query += """
+            AND NOT SUBSTR(oc.option_symbol, 1, 6) GLOB '*[0-9]*'
+            """
+
+        base_query += """
+            ORDER BY oc.volatility DESC
+            LIMIT ?
+        """
+
+        # Pass expiration_date twice (once for subquery, once for main query) plus limit
+        results = self.db.execute_query_volatility(base_query, (expiration_date, expiration_date, limit))
+        
+        logger.info(f"Found {len(results)} volatile CALL options for {expiration_date}")
+        
+        return results
+
     def calculate_metrics(self, option: Dict[str, Any], available_funds: Decimal) -> OptionMetrics:
         """Calculate relevant metrics for an option contract."""
         symbol = option['symbol']

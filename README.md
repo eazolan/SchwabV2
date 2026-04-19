@@ -112,6 +112,11 @@ For covered call opportunities on a specific stock:
 analyze-options calls SYMBOL
 ```
 
+For most volatile CALL options on a specific date:
+```bash
+analyze-options volatility -d 2026-05-01 -r 10
+```
+
 Parameters for PUT analysis:
 - `-f, --funds`: Available funds for trading
 - `-r, --results`: Number of top results to display (default: 10)
@@ -120,6 +125,11 @@ Parameters for PUT analysis:
 
 Parameters for covered calls analysis:
 - `SYMBOL`: Stock symbol to analyze
+- `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers)
+
+Parameters for volatility analysis:
+- `-d, --date`: Expiration date in YYYY-MM-DD format (required)
+- `-r, --results`: Number of top results to display (default: 10)
 - `--include-nonstandard`: Include non-standard options (adjusted for splits/mergers)
 
 ## Folder Structure
@@ -186,3 +196,21 @@ Shows for a single stock:
 - Delta and Theta Greeks
 - Annualized return percentage
 - Return if called percentage
+
+### Volatility Analysis
+Shows the most volatile CALL options for a specific expiration date:
+- Symbol
+- Strike price (lowest OTM strike per symbol)
+- Volatility (implied volatility)
+- Greeks (Delta, Theta, Gamma)
+- Bid/Ask prices
+- Underlying stock price
+- Open Interest and Volume
+
+Options are filtered for:
+- Specific expiration date (user specified)
+- Out-of-the-money only (strike > underlying price)
+- Stocks with volume > 1 million
+- Underlying price > $5
+- One result per symbol (lowest strike price)
+- Standard options only (unless --include-nonstandard is specified)

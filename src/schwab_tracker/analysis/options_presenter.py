@@ -171,6 +171,91 @@ Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         raise
 
 
+class VolatilityPresenter:
+    DEFAULT_FORMAT = TableFormat(
+        headers=['Symbol', 'Strike', 'Volatility', 'Delta', 'Theta', 'Gamma', 'Bid', 'Ask', 'Price', 'OI', 'Volume'],
+        widths=[8, 10, 12, 8, 8, 8, 8, 8, 10, 10, 10],
+        alignments=['<', '>', '>', '>', '>', '>', '>', '>', '>', '>', '>']
+    )
+
+    def __init__(self, table_format: TableFormat = None):
+        self.format = table_format or self.DEFAULT_FORMAT
+
+    def format_volatility_table(self, options: List[Dict]) -> str:
+        """Format volatile call options into a readable table."""
+        output = []
+
+        if not options:
+            return "No volatile call options found for the specified date."
+
+        output.append("\nMost Volatile Call Options")
+        output.append("-" * 40)
+        output.append(f"Expiration Date: {options[0]['expirationDate'][:10]}")
+        output.append(self._format_header())
+        output.append(self._format_separator())
+
+        for option in options:
+            output.append(self._format_option_row(option))
+
+        return "\n".join(output)
+
+    def _format_header(self) -> str:
+        """Create the table header."""
+        return "".join(
+            f"{header:{align}{width}}"
+            for header, width, align in zip(
+                self.format.headers,
+                self.format.widths,
+                self.format.alignments
+            )
+        )
+
+    def _format_separator(self) -> str:
+        """Create the separator line."""
+        return "-" * sum(self.format.widths)
+
+    def _format_option_row(self, option: Dict) -> str:
+        """Format a single volatile option row."""
+        return "".join([
+            f"{option['symbol']:<{self.format.widths[0]}}",
+            f"{option['strikePrice']:>{self.format.widths[1]}.2f}",
+            f"{option['volatility']:>{self.format.widths[2]}.4f}",
+            f"{option['delta'] if option['delta'] else 0:>{self.format.widths[3]}.3f}",
+            f"{option['theta'] if option['theta'] else 0:>{self.format.widths[4]}.3f}",
+            f"{option['gamma'] if option['gamma'] else 0:>{self.format.widths[5]}.3f}",
+            f"{option['bid']:>{self.format.widths[6]}.2f}",
+            f"{option['ask']:>{self.format.widths[7]}.2f}",
+            f"{option['underlyingPrice']:>{self.format.widths[8]}.2f}",
+            f"{option['openInterest']:>{self.format.widths[9]}}",
+            f"{option['totalVolume']:>{self.format.widths[10]}}"
+        ])
+
+
+def create_volatility_report(expiration_date: str, analyzer, limit: int = 10) -> str:
+    """Generate a complete volatility analysis report."""
+    try:
+        options_data = analyzer.get_most_volatile_calls(expiration_date, limit)
+        
+        if not options_data:
+            return f"No volatile call options found for expiration date {expiration_date}"
+
+        presenter = VolatilityPresenter()
+        formatted_table = presenter.format_volatility_table(options_data)
+
+        return f"""
+Volatility Analysis Report
+--------------------------
+Expiration Date: {expiration_date}
+Number of Results: {len(options_data)}
+Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+{formatted_table}
+"""
+    except Exception as e:
+        logger.error(f"Error generating volatility report: {e}")
+        raise
+
+
 def create_covered_calls_report(symbol: str, analyzer) -> str:
     """Generate a complete covered calls analysis report."""
     try:

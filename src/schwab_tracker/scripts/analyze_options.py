@@ -11,7 +11,8 @@ from schwab_tracker.analysis.options_analyzer import OptionsAnalyzer, OptionsScr
 from schwab_tracker.analysis.options_presenter import (
     OptionsPresenter,
     create_options_report,
-    create_covered_calls_report  # Added this import
+    create_covered_calls_report,
+    create_volatility_report
 )
 
 
@@ -68,6 +69,26 @@ def parse_arguments():
         help="Include non-standard options (adjusted for splits/mergers)"
     )
 
+    # Volatility analysis
+    volatility_parser = subparsers.add_parser('volatility', help='Analyze most volatile calls')
+    volatility_parser.add_argument(
+        "-d", "--date",
+        type=str,
+        required=True,
+        help="Expiration date in YYYY-MM-DD format"
+    )
+    volatility_parser.add_argument(
+        "-r", "--results",
+        type=int,
+        default=10,
+        help="Number of results to display (default: 10)"
+    )
+    volatility_parser.add_argument(
+        "--include-nonstandard",
+        action="store_true",
+        help="Include non-standard options (adjusted for splits/mergers)"
+    )
+
     return parser.parse_args()
 
 
@@ -100,8 +121,13 @@ def main():
             report = create_covered_calls_report(symbol, analyzer)
             print(report)
 
+        elif args.command == 'volatility':
+            analyzer = OptionsAnalyzer(db_manager, include_nonstandard=args.include_nonstandard)
+            report = create_volatility_report(args.date, analyzer, args.results)
+            print(report)
+
         else:
-            print("Please specify a command: 'puts' or 'calls'")
+            print("Please specify a command: 'puts', 'calls', or 'volatility'")
 
     except Exception as e:
         logging.error(f"Error in options analysis: {e}")
